@@ -8,6 +8,10 @@
 - Added `Prover::with_hash_lde_blocks` to enable blockwise LDE hashing ([#4075](https://github.com/0xMiden/miden-vm/pull/4075)).
 - Added PVM benchmarks and updated synthetic transaction and recursive verification benchmarks for Eidos ([#4075](https://github.com/0xMiden/miden-vm/pull/4075)).
 
+#### Fixes
+
+- `build_trace` returns an error instead of panicking when a Merkle path request in an execution witness has an empty path or an index that does not fit in the path's depth ([#4044](https://github.com/0xMiden/miden-vm/issues/4044)).
+
 ## v1.0.0-rc.0 (2026-10-21)
 
 #### Features
