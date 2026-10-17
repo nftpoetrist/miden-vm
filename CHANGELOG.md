@@ -47,6 +47,7 @@
 - `smt::get` returns the empty word for an absent key whose leaf holds a single pair for a different key, instead of failing an assertion ([#3979](https://github.com/0xMiden/miden-vm/pull/3979)).
 - [BREAKING] Closed a constraint gap in `MRUPDATE` by requiring the old and new Merkle paths to use the same sibling at each level. Existing VM proofs are incompatible with the updated verifier ([#4002](https://github.com/0xMiden/miden-vm/pull/4002)).
 - [BREAKING] Closed a constraint gap in loop control flow by requiring `REPEAT`, like `LOOP`, to enter the body before the loop's `END`. Existing VM proofs are incompatible with the updated verifier ([#4002](https://github.com/0xMiden/miden-vm/pull/4002)).
+- `build_trace` returns an error instead of panicking when an AEAD stream entry in an execution witness has a keystream or ciphertext lane that is not a u32 value, or a ciphertext lane that is not the plaintext lane XOR its keystream lane ([#4042](https://github.com/0xMiden/miden-vm/issues/4042)).
 
 ## v0.36.0 (Unreleased)
 

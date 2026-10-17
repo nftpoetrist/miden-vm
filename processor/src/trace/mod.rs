@@ -514,9 +514,13 @@ mod wire_tests {
         operations::Operation,
         program::Program,
     };
+    use rstest::rstest;
 
-    use super::{ExecutionWitness, Serializable, build_trace};
-    use crate::{DefaultHost, FastProcessor, Felt, StackInputs, mast::MastNodeId};
+    use super::{
+        ExecutionWitness, Serializable, build_trace,
+        trace_state::{AeadStreamReplayEntry, BitwiseOp, BitwiseReplay, BitwiseReplayEntry},
+    };
+    use crate::{DefaultHost, ExecutionError, FastProcessor, Felt, StackInputs, mast::MastNodeId};
 
     fn execution_witness(source: &str) -> ExecutionWitness {
         let program = Assembler::default()
@@ -642,6 +646,60 @@ mod wire_tests {
         assert_eq!(restored_trace.public_inputs(), original_trace.public_inputs());
         assert_eq!(restored_trace.trace_len_summary(), original_trace.trace_len_summary());
         assert_eq!(restored_trace.clone_air_matrices(), original_trace.clone_air_matrices());
+    }
+
+    /// Rebuilds the bitwise replay of the AEAD stream witness with `tamper` applied to its first
+    /// stream entry, then serializes the witness.
+    fn tampered_aead_stream_witness_bytes(
+        tamper: fn(&mut AeadStreamReplayEntry),
+    ) -> alloc::vec::Vec<u8> {
+        let mut witness = aead_stream_witness();
+        let replay = &mut witness.vm.trace_replay_mut().bitwise_replay;
+        let mut tampered = BitwiseReplay::default();
+        let mut first = true;
+        for entry in core::mem::take(replay) {
+            match entry {
+                BitwiseReplayEntry::AeadStream(mut entry) => {
+                    if first {
+                        tamper(&mut entry);
+                        first = false;
+                    }
+                    tampered.record_aead_stream(*entry);
+                },
+                BitwiseReplayEntry::U32(BitwiseOp::U32And, a, b) => tampered.record_u32and(a, b),
+                BitwiseReplayEntry::U32(BitwiseOp::U32Xor, a, b) => tampered.record_u32xor(a, b),
+            }
+        }
+        assert!(!first, "the witness should contain an AEAD stream entry");
+        *replay = tampered;
+        witness.to_bytes()
+    }
+
+    /// AEAD stream replay entries come from the witness wire, so `build_trace` must reject a lane
+    /// that is not a u32 value, or a ciphertext lane that is not the plaintext lane XOR its
+    /// keystream lane, instead of panicking while it fills the bitwise chiplet.
+    #[rstest]
+    #[case::keystream_not_u32(|entry: &mut AeadStreamReplayEntry| {
+        entry.keystream[0] = Felt::new_unchecked(1 << 32)
+    })]
+    #[case::ciphertext_not_u32(|entry: &mut AeadStreamReplayEntry| {
+        entry.ciphertext[0] = Felt::new_unchecked(1 << 32)
+    })]
+    #[case::ciphertext_mismatch(|entry: &mut AeadStreamReplayEntry| {
+        entry.ciphertext[0] = Felt::new_unchecked(entry.ciphertext[0].as_canonical_u64() ^ 1)
+    })]
+    fn build_trace_rejects_inconsistent_aead_stream_replay(
+        #[case] tamper: fn(&mut AeadStreamReplayEntry),
+    ) {
+        let bytes = tampered_aead_stream_witness_bytes(tamper);
+        let witness = ExecutionWitness::read_from_bytes(&bytes)
+            .expect("the wire reader does not check AEAD stream lanes");
+
+        let result = build_trace(witness.into_parts().0);
+        assert!(
+            matches!(result, Err(ExecutionError::OperationError { .. })),
+            "expected an operation error, got: {result:?}"
+        );
     }
 
     #[test]
