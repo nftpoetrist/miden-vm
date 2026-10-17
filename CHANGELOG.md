@@ -30,6 +30,7 @@
 #### Fixes
 
 - Updated `crypto-bigint` to 0.7.6 and `ctutils` to 0.4.5 to address [RUSTSEC-2026-0387](https://rustsec.org/advisories/RUSTSEC-2026-0387).
+- `build_trace` returns an error instead of panicking when a Merkle path request in an execution witness has an empty path or an index that does not fit in the path's depth ([#4044](https://github.com/0xMiden/miden-vm/issues/4044)).
 
 ## v1.0.0-rc.0 (2026-10-21)
 
