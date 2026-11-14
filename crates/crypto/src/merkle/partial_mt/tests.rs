@@ -548,6 +548,24 @@ fn err_update_leaf() {
     assert!(pmt.update_leaf(8, int_to_node(38)).is_err());
 }
 
+/// Checks that a rejected `update_leaf` on an empty tree leaves the tree unchanged and the tree
+/// remains usable.
+#[test]
+fn update_leaf_on_empty_tree_is_atomic() {
+    let mut pmt = PartialMerkleTree::new();
+
+    assert!(matches!(
+        pmt.update_leaf(0, int_to_node(7)),
+        Err(MerkleError::NodeIndexNotFoundInTree(index)) if index == NodeIndex::root()
+    ));
+    assert_eq!(pmt, PartialMerkleTree::new());
+
+    let mt = MerkleTree::new(VALUES8).unwrap();
+    let path30 = mt.get_path(NODE30).unwrap();
+    pmt.add_path(0, VALUES8[0], path30).unwrap();
+    assert_eq!(pmt.root(), mt.root());
+}
+
 /// Checks that a rejected path leaves the tree unchanged and the tree remains usable.
 #[test]
 fn add_path_conflict_is_atomic() {

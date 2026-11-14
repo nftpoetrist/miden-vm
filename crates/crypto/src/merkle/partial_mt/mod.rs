@@ -455,6 +455,8 @@ impl PartialMerkleTree {
     /// Returns an error if:
     /// - No entry exists at the specified index.
     /// - The specified index is greater than the maximum number of nodes on the deepest layer.
+    ///
+    /// If an error is returned, the tree is unchanged.
     pub fn update_leaf(&mut self, index: u64, value: Word) -> Result<Word, MerkleError> {
         let mut node_index = NodeIndex::new(self.max_depth(), index)?;
 
@@ -465,11 +467,12 @@ impl PartialMerkleTree {
             }
         }
 
-        // add node value to the nodes Map
-        let old_value = self
+        // replace the node value, checking that the node exists before changing the tree
+        let node = self
             .nodes
-            .insert(node_index, value)
+            .get_mut(&node_index)
             .ok_or(MerkleError::NodeIndexNotFoundInTree(node_index))?;
+        let old_value = core::mem::replace(node, value);
 
         // if the old value and new value are the same, there is nothing to update
         if value == old_value {
