@@ -445,6 +445,28 @@ fn zero_immediate_comparisons_preserve_the_full_stack() {
 }
 
 #[test]
+fn zero_immediate_mul_and_exp_preserve_the_full_stack() {
+    let mut inputs: Vec<u64> = (1..=16).collect();
+    for (op, result) in [("mul.0", 0), ("exp.0", 1)] {
+        for value in [0, 1, u32::MAX as u64, 1_u64 << 32, Felt::ORDER_U64 - 1] {
+            inputs[0] = value;
+            let mut expected = inputs.clone();
+            expected[0] = result;
+
+            // Avoid build_op_test!'s stack truncation: it could hide an extra overflow row.
+            let test = build_test!(&format!("begin {op} end"), &inputs);
+            test.expect_stack(&expected);
+        }
+
+        // A called procedure must return with the stack depth it was called with.
+        let mut expected = inputs.clone();
+        expected[0] = result;
+        let test = build_test!(&format!("proc f {op} end begin call.f end"), &inputs);
+        test.expect_stack(&expected);
+    }
+}
+
+#[test]
 fn optimized_lowerings_preserve_overflow_values_and_satisfy_constraints() {
     let inputs: Vec<u64> = (1..=16).collect();
     let test = build_test!(
